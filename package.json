@@ -1,5 +1,5 @@
 {
-  "name": "headless-byteball",
+  "name": "headless-byteball-light",
   "description": "Byteball headless wallet",
   "author": "Byteball",
   "version": "0.1.9",
@@ -26,6 +26,7 @@
     "byteballcore": "git+https://github.com/byteball/byteballcore.git",
     "bitcore-lib": "^0.13.14",
     "bitcore-mnemonic": "~1.0.0",
-    "json-rpc2": "^1.0.2"
+    "json-rpc2": "^1.0.2",
+	  "minimist": "^1.2.0"
   }
 }
