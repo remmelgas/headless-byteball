@@ -77,13 +77,6 @@ async function Start() {
 		const network = require('byteballcore/network');
 		const myWitnesses = require('byteballcore/my_witnesses');
 
-
-		if (conf.bLight) {
-			const light_wallet = require('byteballcore/light_wallet.js');
-			light_wallet.setLightVendorHost(conf.hub);
-		}
-
-
 		let assocIndexesToWallets = [];
 
 		let mnemonic = new Mnemonic(mnemonic_phrase);
@@ -289,8 +282,11 @@ async function Start() {
 			setCurrentWallet();
 		}
 
-		if (conf.bLight)
+		if (conf.bLight) {
+			require('byteballcore/light_wallet.js').setLightVendorHost(conf.hub);
 			scanForAddressesAndWalletsInLightClient(mnemonic_phrase, cleanAndAddWalletsAndAddresses);
+		}
+
 		else
 			scanForAddressesAndWallets(mnemonic_phrase, cleanAndAddWalletsAndAddresses)
 
