@@ -18,6 +18,17 @@ The first time you run it, it will generate a new extended private key (BIP44) a
 
 After you enter the passphrase, the wallet redirects all output to a log file in your app data directory but it still holds the terminal window.  To release it, type Ctrl-Z, then bg to resume the wallet in the background.  After that, you can safely terminate the ssh session.
 
+## Recovery from seed
+```sh
+node recovery.js
+```
+
+### supported args
+
+```sh
+limit=?|default 20
+```
+
 ## Customize
 
 If you want to change any defaults, refer to the documentation of [byteballcore](../../../byteballcore), the core Byteball library `require()`'d from here.  Below are some headless wallet specific settings you might want to change:
@@ -26,7 +37,7 @@ If you want to change any defaults, refer to the documentation of [byteballcore]
 * `payout_address`: if you give `pay` command over chat interface, the money will be sent to this Byteball address.
 * `hub`: hub address without wss://, the default is `byteball.org/bb`.
 * `deviceName`: the name of your device as seen in the chat interface.
-* `permanent_pairing_secret`: the pairing secret used to authenticate pairing requests when you pair your GUI wallet for remote control.  The pairing secret is the part of the pairing code after #.
+* `permanent_paring_secret`: the pairing secret used to authenticate pairing requests when you pair your GUI wallet for remote control.  The pairing secret is the part of the pairing code after #.
 
 
 ## Remote control

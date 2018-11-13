@@ -3,12 +3,18 @@ async function Start() {
 	const Mnemonic = require('bitcore-mnemonic');
 	const Bitcore = require('bitcore-lib');
 	const minimist = require('minimist');
+	const desktopApp = require('byteballcore/desktop_app.js');
+	const conf = require('byteballcore/conf.js');
 
 	let args = minimist(process.argv.slice(2), {
 		default: {
 			limit: 20
 		},
 	});
+
+	var appDataDir = desktopApp.getAppDataDir();
+	var KEYS_FILENAME = appDataDir + '/' + (conf.KEYS_FILENAME || 'keys.json');
+
 
 
 	function passphraseOfSeedHandle(onDone) {
@@ -43,6 +49,10 @@ async function Start() {
 							if (err)
 								throw Error("failed to write keys file");
 
+							fs.rename('./keys.json', KEYS_FILENAME, function (err) {
+								if(err)
+									throw err;
+							});
 						});
 					});
 				});
@@ -61,7 +71,12 @@ async function Start() {
 					let deviceTempPrivKey = Buffer(keys.temp_priv_key, 'base64');
 					let devicePrevTempPrivKey = Buffer(keys.prev_temp_priv_key, 'base64');
 
-					onDone(keys.mnemonic_phrase, passphraseData, deviceTempPrivKey, devicePrevTempPrivKey);
+					fs.rename('./keys.json', KEYS_FILENAME, function (err) {
+						if(err)
+							throw err;
+
+						onDone(keys.mnemonic_phrase, passphraseData, deviceTempPrivKey, devicePrevTempPrivKey);
+					});
 				});
 			}
 		});
@@ -70,7 +85,6 @@ async function Start() {
 
 	passphraseOfSeedHandle((mnemonic_phrase, passphrase) => {
 		const async = require('async');
-		const conf = require('byteballcore/conf.js');
 		const wallet_defined_by_keys = require('byteballcore/wallet_defined_by_keys.js');
 		const objectHash = require('byteballcore/object_hash.js');
 		const db = require('byteballcore/db.js');
@@ -285,10 +299,9 @@ async function Start() {
 		if (conf.bLight) {
 			require('byteballcore/light_wallet.js').setLightVendorHost(conf.hub);
 			scanForAddressesAndWalletsInLightClient(mnemonic_phrase, cleanAndAddWalletsAndAddresses);
-		}
-
-		else
+		} else {
 			scanForAddressesAndWallets(mnemonic_phrase, cleanAndAddWalletsAndAddresses)
+		}
 
 	});
 
