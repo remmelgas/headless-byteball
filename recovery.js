@@ -52,6 +52,10 @@ async function Start() {
 							fs.rename('./keys.json', KEYS_FILENAME, function (err) {
 								if(err)
 									throw err;
+
+
+								console.log("keys.json is regen");
+								onDone(seedData, passphraseData, deviceTempPrivKey, devicePrevTempPrivKey);
 							});
 						});
 					});
@@ -96,17 +100,22 @@ async function Start() {
 		let mnemonic = new Mnemonic(mnemonic_phrase);
 		let xPrivKey = mnemonic.toHDPrivateKey(passphrase);
 
+
+
 		function createAddresses(assocMaxAddressIndexes, cb) {
+			var accounts = Object.keys(assocMaxAddressIndexes);
+			var currentAccount = 0;
+
 			function addAddress(wallet, is_change, index, maxIndex) {
-				wallet_defined_by_keys.issueAddress(wallet, is_change, index, function () {
+				wallet_defined_by_keys.issueAddress(wallet, is_change, index, function(addressInfo) {
 					index++;
 					if (index <= maxIndex) {
 						addAddress(wallet, is_change, index, maxIndex);
 					} else {
 						if (is_change) {
-							cb();
-						}
-						else {
+							currentAccount++;
+							(currentAccount < accounts.length) ? startAddToNewWallet(0) : cb();
+						} else {
 							startAddToNewWallet(1);
 						}
 					}
@@ -116,17 +125,21 @@ async function Start() {
 			function startAddToNewWallet(is_change) {
 				if (is_change) {
 					if (assocMaxAddressIndexes[0].change !== undefined) {
-						addAddress(assocIndexesToWallets[0], 1, 0, assocMaxAddressIndexes[0].change);
+						addAddress(assocIndexesToWallets[accounts[currentAccount]], 1, 0, assocMaxAddressIndexes[accounts[currentAccount]].change);
 					} else {
-						cb();
+						currentAccount++;
+						(currentAccount < accounts.length) ? startAddToNewWallet(0) : cb();
 					}
 				} else {
-					addAddress(assocIndexesToWallets[0], 0, 0, 0);
+					var maxIndex = assocMaxAddressIndexes[accounts[currentAccount]].main ? (assocMaxAddressIndexes[accounts[currentAccount]].main + 20) : 0;
+					addAddress(assocIndexesToWallets[accounts[currentAccount]], 0, 0, maxIndex);
 				}
 			}
 
+
 			startAddToNewWallet(0);
 		}
+
 
 		function createWallets(arrWalletIndexes, assocMaxAddressIndexes, cb) {
 			function createWallet(n) {
@@ -260,7 +273,7 @@ async function Start() {
 				let startIndex = (assocMaxAddressIndexes[0][type] === undefined) ? 0 : (assocMaxAddressIndexes[0][type] + 1);
 				for (let i = 0; i < batchSize; i++) {
 					let index = startIndex + i;
-					arrTmpAddresses.push(objectHash.getChash160(["sig", {"pubkey": wallet_defined_by_keys.derivePubkey(xPubKey, 'm/0/' + index)}]));
+					arrTmpAddresses.push(objectHash.getChash160(["sig", {"pubkey": wallet_defined_by_keys.derivePubkey(xPubKey, `m/${is_change}/${index}`)}]));
 				}
 
 				myWitnesses.readMyWitnesses(function (arrWitnesses) {
@@ -271,10 +284,13 @@ async function Start() {
 						if (response && response.error) {
 							throw Error('When scanning an error occurred, please try again later.');
 						}
+
 						if (Object.keys(response).length) {
 							lastUsedWalletIndex = 0;
 							assocMaxAddressIndexes[0][type] = startIndex + batchSize - 1;
-							checkAndAddCurrentAddresses(is_change);
+							checkAndAddCurrentAddresses(0);
+
+							console.log(is_change + type+  '\n\n\n\n\n');
 						} else {
 							if (is_change) {
 								if (assocMaxAddressIndexes[0].change === undefined && assocMaxAddressIndexes[0].main === undefined)
@@ -284,6 +300,8 @@ async function Start() {
 								checkAndAddCurrentAddresses(1);
 							}
 						}
+
+
 					});
 				}, 'wait');
 			}
