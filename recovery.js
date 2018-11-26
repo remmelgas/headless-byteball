@@ -289,8 +289,6 @@ async function Start() {
 							lastUsedWalletIndex = 0;
 							assocMaxAddressIndexes[0][type] = startIndex + batchSize - 1;
 							checkAndAddCurrentAddresses(0);
-
-							console.log(is_change + type+  '\n\n\n\n\n');
 						} else {
 							if (is_change) {
 								if (assocMaxAddressIndexes[0].change === undefined && assocMaxAddressIndexes[0].main === undefined)
