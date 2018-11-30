@@ -5,40 +5,32 @@ async function Start() {
 	const minimist = require('minimist');
 	const desktopApp = require('byteballcore/desktop_app.js');
 	const conf = require('byteballcore/conf.js');
-
 	let args = minimist(process.argv.slice(2), {
 		default: {
 			limit: 20
 		},
 	});
-
 	const appDataDir = desktopApp.getAppDataDir();
 	const KEYS_FILENAME = appDataDir + '/' + (conf.KEYS_FILENAME || 'keys.json');
-
 	function passphraseOfSeedHandle(onDone) {
 		const rl = require('readline').createInterface({
 			input: process.stdin,
 			output: process.stdout
 		});
 		const fs = require('fs');
-
 		fs.readFile('keys.json', 'utf8', (err, keysData) => {
 			if(err) {
 				rl.question('Please insert seed words in line: ', (seedData) => {
 					seedData = !seedData ? require('os').hostname() || 'Headless' : seedData;
 					rl.question('Please insert passphrase: ', (passphraseData) => {
 						rl.close();
-
 						if (process.stdout.moveCursor) process.stdout.moveCursor(0, -1);
 						if (process.stdout.clearLine) process.stdout.clearLine();
 						let deviceTempPrivKey = crypto.randomBytes(32);
 						let devicePrevTempPrivKey = crypto.randomBytes(32);
-
 						let mnemonic = new Mnemonic();
-
 						if (!Mnemonic.isValid(mnemonic.toString()))
 							throw new Error("Incorrect mnemonica validation");
-
 						fs.writeFile('keys.json', JSON.stringify({
 							mnemonic_phrase: seedData,
 							temp_priv_key: deviceTempPrivKey.toString('base64'),
@@ -46,13 +38,10 @@ async function Start() {
 						}, null, '\t'), function (err) {
 							if (err)
 								throw Error("failed to write keys file");
-
 							fs.rename('./keys.json', KEYS_FILENAME, function (err) {
 								if(err)
 									throw err;
 
-
-								console.log("keys.json is regen");
 								onDone(seedData, passphraseData, deviceTempPrivKey, devicePrevTempPrivKey);
 							});
 						});
@@ -63,26 +52,22 @@ async function Start() {
 			else {
 				rl.question('passphrase: ', (passphraseData) => {
 					rl.close();
-
 					if (process.stdout.moveCursor) process.stdout.moveCursor(0, -1);
 					if (process.stdout.clearLine) process.stdout.clearLine();
-
 					let keys = JSON.parse(keysData);
-
 					let deviceTempPrivKey = Buffer(keys.temp_priv_key, 'base64');
 					let devicePrevTempPrivKey = Buffer(keys.prev_temp_priv_key, 'base64');
 
-					//fs.rename('./keys.json', KEYS_FILENAME, function (err) {
-					//	if (err)
-					//		throw err;
+					fs.rename('./keys.json', KEYS_FILENAME, function (err) {
+						if (err)
+							throw err;
 
 						onDone(keys.mnemonic_phrase, passphraseData, deviceTempPrivKey, devicePrevTempPrivKey);
-					//});
+					});
 				});
 			}
 		});
 	}
-
 
 	passphraseOfSeedHandle((mnemonic_phrase, passphrase) => {
 		const async = require('async');
@@ -97,8 +82,6 @@ async function Start() {
 		let mnemonic = new Mnemonic(mnemonic_phrase);
 		let xPrivKey = mnemonic.toHDPrivateKey(passphrase);
 
-
-
 		function createAddresses(assocMaxAddressIndexes, cb) {
 			function addAddress(wallet, is_change, index, maxIndex) {
 				wallet_defined_by_keys.issueAddress(wallet, is_change, index, function() {
@@ -111,23 +94,20 @@ async function Start() {
 				});
 			}
 
-
 			function startAddToNewWallet(is_change) {
 				if (is_change) {
-					if (assocMaxAddressIndexes[0].change !== undefined) {
+					if (assocMaxAddressIndexes[0].change !== undefined)
 						addAddress(walletId, 1, 0, assocMaxAddressIndexes[0].change);
-					} else {
+					else
 						cb();
-					}
+
 				} else {
 					addAddress(walletId, 0, 0,
 						assocMaxAddressIndexes[0].main ? (assocMaxAddressIndexes[0].main + args.limit) : 0);
 				}
 			}
-
 			startAddToNewWallet(0);
 		}
-
 
 		function createWallet(cb) {
 			let devicePrivKey = xPrivKey.derive("m/1'").privateKey.bn.toBuffer({size: 32});
@@ -155,7 +135,6 @@ async function Start() {
 			});
 		}
 
-
 		function removeAddressesAndWallets(cb) {
 			let arrQueries = [];
 			db.addQuery(arrQueries, "DELETE FROM pending_shared_address_signing_paths");
@@ -167,7 +146,6 @@ async function Start() {
 			db.addQuery(arrQueries, "DELETE FROM extended_pubkeys");
 			db.addQuery(arrQueries, "DELETE FROM wallets");
 			db.addQuery(arrQueries, "DELETE FROM correspondent_devices");
-
 			async.series(arrQueries, cb);
 		}
 
@@ -200,19 +178,16 @@ async function Start() {
 				determineIfAddressUsed(address, function (bUsed) {
 					if (bUsed) {
 						lastUsedAddressIndex = currentAddressIndex;
-						if (!assocMaxAddressIndexes[0]) assocMaxAddressIndexes[0] = {main: 0};
-						if (is_change) {
-							assocMaxAddressIndexes[0].change = currentAddressIndex;
-						} else {
-							assocMaxAddressIndexes[0].main = currentAddressIndex;
-						}
+						if (!assocMaxAddressIndexes[0])
+							assocMaxAddressIndexes[0] = {main: 0};
+
+						assocMaxAddressIndexes[0][is_change ? 'change':'main'] = currentAddressIndex;
 						currentAddressIndex++;
 						checkAndAddCurrentAddress(is_change);
 					} else {
 						currentAddressIndex++;
 						if (currentAddressIndex - lastUsedAddressIndex >= args.limit) {
 							if (is_change) {
-
 								cb(assocMaxAddressIndexes);
 							} else {
 								currentAddressIndex = 0;
@@ -267,17 +242,14 @@ async function Start() {
 					});
 				}, 'wait');
 			}
-
 			checkAndAddCurrentAddresses(0);
 		}
-
 		if (conf.bLight) {
 			require('byteballcore/light_wallet.js').setLightVendorHost(conf.hub);
 			scanForAddressesAndWalletsInLightClient(mnemonic_phrase, cleanAndAddWalletsAndAddresses);
 		} else {
 			scanForAddressesAndWallets(mnemonic_phrase, cleanAndAddWalletsAndAddresses)
 		}
-
 	});
 
 	return 'Ok';
