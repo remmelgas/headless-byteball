@@ -12,10 +12,8 @@ async function Start() {
 		},
 	});
 
-	var appDataDir = desktopApp.getAppDataDir();
-	var KEYS_FILENAME = appDataDir + '/' + (conf.KEYS_FILENAME || 'keys.json');
-
-
+	const appDataDir = desktopApp.getAppDataDir();
+	const KEYS_FILENAME = appDataDir + '/' + (conf.KEYS_FILENAME || 'keys.json');
 
 	function passphraseOfSeedHandle(onDone) {
 		const rl = require('readline').createInterface({
@@ -62,8 +60,7 @@ async function Start() {
 				});
 			}
 
-			else
-			{
+			else {
 				rl.question('passphrase: ', (passphraseData) => {
 					rl.close();
 
@@ -76,7 +73,7 @@ async function Start() {
 					let devicePrevTempPrivKey = Buffer(keys.prev_temp_priv_key, 'base64');
 
 					fs.rename('./keys.json', KEYS_FILENAME, function (err) {
-						if(err)
+						if (err)
 							throw err;
 
 						onDone(keys.mnemonic_phrase, passphraseData, deviceTempPrivKey, devicePrevTempPrivKey);
@@ -95,7 +92,7 @@ async function Start() {
 		const network = require('byteballcore/network');
 		const myWitnesses = require('byteballcore/my_witnesses');
 
-		let assocIndexesToWallets = [];
+		let gWallet = null;
 
 		let mnemonic = new Mnemonic(mnemonic_phrase);
 		let xPrivKey = mnemonic.toHDPrivateKey(passphrase);
@@ -103,60 +100,47 @@ async function Start() {
 
 
 		function createAddresses(assocMaxAddressIndexes, cb) {
-			var accounts = Object.keys(assocMaxAddressIndexes);
-			var currentAccount = 0;
-
 			function addAddress(wallet, is_change, index, maxIndex) {
-				wallet_defined_by_keys.issueAddress(wallet, is_change, index, function(addressInfo) {
+				wallet_defined_by_keys.issueAddress(wallet, is_change, index, function() {
 					index++;
 					if (index <= maxIndex) {
 						addAddress(wallet, is_change, index, maxIndex);
 					} else {
-						if (is_change) {
-							currentAccount++;
-							(currentAccount < accounts.length) ? startAddToNewWallet(0) : cb();
-						} else {
-							startAddToNewWallet(1);
-						}
+						startAddToNewWallet(is_change ? 0 : 1);
 					}
 				});
 			}
 
+
 			function startAddToNewWallet(is_change) {
 				if (is_change) {
 					if (assocMaxAddressIndexes[0].change !== undefined) {
-						addAddress(assocIndexesToWallets[accounts[currentAccount]], 1, 0, assocMaxAddressIndexes[accounts[currentAccount]].change);
+						addAddress(gWallet, 1, 0, assocMaxAddressIndexes[0].change);
 					} else {
-						currentAccount++;
-						(currentAccount < accounts.length) ? startAddToNewWallet(0) : cb();
+						cb();
 					}
 				} else {
-					var maxIndex = assocMaxAddressIndexes[accounts[currentAccount]].main ? (assocMaxAddressIndexes[accounts[currentAccount]].main + 20) : 0;
-					addAddress(assocIndexesToWallets[accounts[currentAccount]], 0, 0, maxIndex);
+					addAddress(gWallet, 0, 0,
+						assocMaxAddressIndexes[0].main ? (assocMaxAddressIndexes[0].main + args.limit) : 0);
 				}
 			}
-
 
 			startAddToNewWallet(0);
 		}
 
 
 		function createWallets(arrWalletIndexes, assocMaxAddressIndexes, cb) {
-			function createWallet(n) {
-				let devicePrivKey = xPrivKey.derive("m/1'").privateKey.bn.toBuffer({size: 32});
-				let device = require('byteballcore/device.js');
-				device.setDevicePrivateKey(devicePrivKey);
-				let strXPubKey = Bitcore.HDPublicKey(xPrivKey.derive("m/44'/0'/0'")).toString();
-				let walletDefinedByKeys = require('byteballcore/wallet_defined_by_keys.js');
-				walletDefinedByKeys.createWalletByDevices(strXPubKey, 0, 1, [], 'any walletName', false, (wallet_id) => {
-					walletDefinedByKeys.issueNextAddress(wallet_id, 0, () => {
-						assocIndexesToWallets[0] = wallet_id;
-						cb();
-					});
+			let devicePrivKey = xPrivKey.derive("m/1'").privateKey.bn.toBuffer({size: 32});
+			let device = require('byteballcore/device.js');
+			device.setDevicePrivateKey(devicePrivKey);
+			let strXPubKey = Bitcore.HDPublicKey(xPrivKey.derive("m/44'/0'/0'")).toString();
+			let walletDefinedByKeys = require('byteballcore/wallet_defined_by_keys.js');
+			walletDefinedByKeys.createWalletByDevices(strXPubKey, 0, 1, [], 'any walletName', false, (wallet_id) => {
+				walletDefinedByKeys.issueNextAddress(wallet_id, 0, () => {
+					gWallet = wallet_id;
+					cb();
 				});
-			}
-
-			createWallet(0);
+			});
 		}
 
 		function determineIfAddressUsed(address, cb) {
@@ -173,7 +157,7 @@ async function Start() {
 
 
 		function removeAddressesAndWallets(cb) {
-			var arrQueries = [];
+			let arrQueries = [];
 			db.addQuery(arrQueries, "DELETE FROM pending_shared_address_signing_paths");
 			db.addQuery(arrQueries, "DELETE FROM shared_address_signing_paths");
 			db.addQuery(arrQueries, "DELETE FROM pending_shared_addresses");
@@ -206,11 +190,9 @@ async function Start() {
 		}
 
 		function scanForAddressesAndWallets(mnemonic, cb) {
-			let xPubKey;
+			let xPubKey = Bitcore.HDPublicKey(xPrivKey.derive("m/44'/0'/0'"));
 			let lastUsedAddressIndex = -1;
-			let lastUsedWalletIndex = -1;
 			let currentAddressIndex = 0;
-			let currentWalletIndex = 0;
 			let assocMaxAddressIndexes = {};
 
 			function checkAndAddCurrentAddress(is_change) {
@@ -218,11 +200,11 @@ async function Start() {
 				determineIfAddressUsed(address, function (bUsed) {
 					if (bUsed) {
 						lastUsedAddressIndex = currentAddressIndex;
-						if (!assocMaxAddressIndexes[currentWalletIndex]) assocMaxAddressIndexes[currentWalletIndex] = {main: 0};
+						if (!assocMaxAddressIndexes[0]) assocMaxAddressIndexes[0] = {main: 0};
 						if (is_change) {
-							assocMaxAddressIndexes[currentWalletIndex].change = currentAddressIndex;
+							assocMaxAddressIndexes[0].change = currentAddressIndex;
 						} else {
-							assocMaxAddressIndexes[currentWalletIndex].main = currentAddressIndex;
+							assocMaxAddressIndexes[0].main = currentAddressIndex;
 						}
 						currentAddressIndex++;
 						checkAndAddCurrentAddress(is_change);
@@ -230,15 +212,8 @@ async function Start() {
 						currentAddressIndex++;
 						if (currentAddressIndex - lastUsedAddressIndex >= args.limit) {
 							if (is_change) {
-								if (lastUsedAddressIndex !== -1) {
-									lastUsedWalletIndex = currentWalletIndex;
-								}
-								if (currentWalletIndex - lastUsedWalletIndex >= args.limit) {
-									cb(assocMaxAddressIndexes);
-								} else {
-									currentWalletIndex++;
-									setCurrentWallet();
-								}
+
+								cb(assocMaxAddressIndexes);
 							} else {
 								currentAddressIndex = 0;
 								checkAndAddCurrentAddress(1);
@@ -250,19 +225,11 @@ async function Start() {
 				})
 			}
 
-			function setCurrentWallet() {
-				xPubKey = Bitcore.HDPublicKey(xPrivKey.derive("m/44'/0'/" + currentWalletIndex + "'"));
-				lastUsedAddressIndex = -1;
-				currentAddressIndex = 0;
-				checkAndAddCurrentAddress(0);
-			}
-
-			setCurrentWallet();
+			checkAndAddCurrentAddress(0);
 		}
 		function scanForAddressesAndWalletsInLightClient(mnemonic, cb) {
-			let lastUsedWalletIndex = -1;
 			let assocMaxAddressIndexes = {};
-			let xPubKey = null;
+			let xPubKey = Bitcore.HDPublicKey(xPrivKey.derive("m/44'/0'/0'"));
 
 			function checkAndAddCurrentAddresses(is_change) {
 				let type = is_change ? 'change' : 'main';
@@ -286,7 +253,6 @@ async function Start() {
 						}
 
 						if (Object.keys(response).length) {
-							lastUsedWalletIndex = 0;
 							assocMaxAddressIndexes[0][type] = startIndex + batchSize - 1;
 							checkAndAddCurrentAddresses(0);
 						} else {
@@ -304,12 +270,7 @@ async function Start() {
 				}, 'wait');
 			}
 
-			function setCurrentWallet() {
-				xPubKey = Bitcore.HDPublicKey(xPrivKey.derive("m/44'/0'/0'"));
-				checkAndAddCurrentAddresses(0);
-			}
-
-			setCurrentWallet();
+			checkAndAddCurrentAddresses(0);
 		}
 
 		if (conf.bLight) {
