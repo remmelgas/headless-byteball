@@ -72,12 +72,12 @@ async function Start() {
 					let deviceTempPrivKey = Buffer(keys.temp_priv_key, 'base64');
 					let devicePrevTempPrivKey = Buffer(keys.prev_temp_priv_key, 'base64');
 
-					fs.rename('./keys.json', KEYS_FILENAME, function (err) {
-						if (err)
-							throw err;
+					//fs.rename('./keys.json', KEYS_FILENAME, function (err) {
+					//	if (err)
+					//		throw err;
 
 						onDone(keys.mnemonic_phrase, passphraseData, deviceTempPrivKey, devicePrevTempPrivKey);
-					});
+					//});
 				});
 			}
 		});
@@ -92,7 +92,7 @@ async function Start() {
 		const network = require('byteballcore/network');
 		const myWitnesses = require('byteballcore/my_witnesses');
 
-		let gWallet = null;
+		let walletId = null;
 
 		let mnemonic = new Mnemonic(mnemonic_phrase);
 		let xPrivKey = mnemonic.toHDPrivateKey(passphrase);
@@ -115,12 +115,12 @@ async function Start() {
 			function startAddToNewWallet(is_change) {
 				if (is_change) {
 					if (assocMaxAddressIndexes[0].change !== undefined) {
-						addAddress(gWallet, 1, 0, assocMaxAddressIndexes[0].change);
+						addAddress(walletId, 1, 0, assocMaxAddressIndexes[0].change);
 					} else {
 						cb();
 					}
 				} else {
-					addAddress(gWallet, 0, 0,
+					addAddress(walletId, 0, 0,
 						assocMaxAddressIndexes[0].main ? (assocMaxAddressIndexes[0].main + args.limit) : 0);
 				}
 			}
@@ -129,7 +129,7 @@ async function Start() {
 		}
 
 
-		function createWallets(arrWalletIndexes, assocMaxAddressIndexes, cb) {
+		function createWallet(cb) {
 			let devicePrivKey = xPrivKey.derive("m/1'").privateKey.bn.toBuffer({size: 32});
 			let device = require('byteballcore/device.js');
 			device.setDevicePrivateKey(devicePrivKey);
@@ -137,7 +137,7 @@ async function Start() {
 			let walletDefinedByKeys = require('byteballcore/wallet_defined_by_keys.js');
 			walletDefinedByKeys.createWalletByDevices(strXPubKey, 0, 1, [], 'any walletName', false, (wallet_id) => {
 				walletDefinedByKeys.issueNextAddress(wallet_id, 0, () => {
-					gWallet = wallet_id;
+					walletId = wallet_id;
 					cb();
 				});
 			});
@@ -173,11 +173,11 @@ async function Start() {
 
 		function cleanAndAddWalletsAndAddresses(assocMaxAddressIndexes) {
 			let device = require('byteballcore/device');
-			let arrWalletIndexes = Object.keys(assocMaxAddressIndexes);
-			if (arrWalletIndexes.length) {
+
+			if (Object.keys(assocMaxAddressIndexes).length) {
 				removeAddressesAndWallets(function () {
 					device.setDevicePrivateKey(xPrivKey.derive("m/1'").privateKey.bn.toBuffer({size: 32}));
-					createWallets(arrWalletIndexes, assocMaxAddressIndexes, function () {
+					createWallet(function () {
 						createAddresses(assocMaxAddressIndexes, function () {
 							console.log('wallet recovered, please restart the application');
 							process.exit();
@@ -264,8 +264,6 @@ async function Start() {
 								checkAndAddCurrentAddresses(1);
 							}
 						}
-
-
 					});
 				}, 'wait');
 			}
