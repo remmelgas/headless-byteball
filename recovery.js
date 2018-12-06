@@ -10,6 +10,7 @@ async function Start() {
 			limit: 20
 		},
 	});
+
 	const appDataDir = desktopApp.getAppDataDir();
 	const KEYS_FILENAME = appDataDir + '/' + (conf.KEYS_FILENAME || 'keys.json');
 	function passphraseOfSeedHandle(onDone) {
@@ -28,11 +29,11 @@ async function Start() {
 						if (process.stdout.clearLine) process.stdout.clearLine();
 						let deviceTempPrivKey = crypto.randomBytes(32);
 						let devicePrevTempPrivKey = crypto.randomBytes(32);
-						let mnemonic = new Mnemonic();
+						let mnemonic = new Mnemonic(seedData);
 						if (!Mnemonic.isValid(mnemonic.toString()))
 							throw new Error("Incorrect mnemonica validation");
 						fs.writeFile('keys.json', JSON.stringify({
-							mnemonic_phrase: seedData,
+							mnemonic_phrase: mnemonic.phrase,
 							temp_priv_key: deviceTempPrivKey.toString('base64'),
 							prev_temp_priv_key: devicePrevTempPrivKey.toString('base64')
 						}, null, '\t'), function (err) {
@@ -42,7 +43,7 @@ async function Start() {
 								if(err)
 									throw err;
 
-								onDone(seedData, passphraseData, deviceTempPrivKey, devicePrevTempPrivKey);
+								onDone(mnemonic.phrase, passphraseData, deviceTempPrivKey, devicePrevTempPrivKey);
 							});
 						});
 					});
