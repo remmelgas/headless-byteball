@@ -19,7 +19,7 @@ async function Start() {
 			output: process.stdout
 		});
 		const fs = require('fs');
-		fs.readFile('keys.json', 'utf8', (err, keysData) => {
+		fs.readFile(KEYS_FILENAME, 'utf8', (err, keysData) => {
 			if(err) {
 				rl.question('Please insert seed words in line: ', (seedData) => {
 					seedData = !seedData ? require('os').hostname() || 'Headless' : seedData;
@@ -32,19 +32,14 @@ async function Start() {
 						let mnemonic = new Mnemonic(seedData);
 						if (!Mnemonic.isValid(mnemonic.toString()))
 							throw new Error("Incorrect mnemonica validation");
-						fs.writeFile('keys.json', JSON.stringify({
+						fs.writeFile(KEYS_FILENAME, JSON.stringify({
 							mnemonic_phrase: mnemonic.phrase,
 							temp_priv_key: deviceTempPrivKey.toString('base64'),
 							prev_temp_priv_key: devicePrevTempPrivKey.toString('base64')
 						}, null, '\t'), function (err) {
 							if (err)
 								throw Error("failed to write keys file");
-							fs.rename('./keys.json', KEYS_FILENAME, function (err) {
-								if(err)
-									throw err;
-
-								onDone(mnemonic.phrase, passphraseData, deviceTempPrivKey, devicePrevTempPrivKey);
-							});
+							onDone(mnemonic.phrase, passphraseData, deviceTempPrivKey, devicePrevTempPrivKey);
 						});
 					});
 				});
@@ -59,12 +54,7 @@ async function Start() {
 					let deviceTempPrivKey = Buffer(keys.temp_priv_key, 'base64');
 					let devicePrevTempPrivKey = Buffer(keys.prev_temp_priv_key, 'base64');
 
-					fs.rename('./keys.json', KEYS_FILENAME, function (err) {
-						if (err)
-							throw err;
-
-						onDone(keys.mnemonic_phrase, passphraseData, deviceTempPrivKey, devicePrevTempPrivKey);
-					});
+					onDone(keys.mnemonic_phrase, passphraseData, deviceTempPrivKey, devicePrevTempPrivKey);
 				});
 			}
 		});
