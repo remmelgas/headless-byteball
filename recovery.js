@@ -99,7 +99,7 @@ async function Start() {
 			}
 			startAddToNewWallet(0);
 		}
-
+ 
 		function createWallet(cb) {
 			let devicePrivKey = xPrivKey.derive("m/1'").privateKey.bn.toBuffer({size: 32});
 			let device = require('byteballcore/device.js');
